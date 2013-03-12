@@ -38,6 +38,12 @@ public class PeergreenKernelFrameworkHandler implements InvocationHandler {
      */
     private final Framework wrappedFramework;
 
+
+    /**
+     * Framework has been initialized ?
+     */
+    private boolean initialized = false;
+
     /**
      * Builds a new proxy handler for the given kernel and wrapped OSGi framework
      * @param kernel the peergreen kernel for init/start methods
@@ -60,8 +66,15 @@ public class PeergreenKernelFrameworkHandler implements InvocationHandler {
         // init
         if ("init".equals(method.getName())) {
             // call kernel.init()
+            initialized = true;
             return invokeKernelMethod(getKernelMethod("init"));
         } else if ("start".equals(method.getName())) {
+
+            // Not yet initialized, init
+            if (!initialized) {
+                invokeKernelMethod(getKernelMethod("init"));
+            }
+
             // call kernel.start(false)
             return invokeKernelMethod(getKernelMethod("start", Boolean.TYPE), Boolean.FALSE);
         }
