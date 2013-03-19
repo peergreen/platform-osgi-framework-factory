@@ -20,6 +20,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.security.AccessController;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.osgi.framework.launch.Framework;
@@ -35,12 +36,24 @@ import com.peergreen.bootstrap.BootstrapException;
 public class PeergreenFrameworkFactory implements FrameworkFactory {
 
     /**
+     * ENABLE console at startup ?
+     */
+    public static final String CONSOLE_SHELL = "com.peergreen.shell.console";
+
+
+    /**
      * Create a new Peergreen {@link Framework} instance.
      * @param configuration the properties to use
      * @return a new instance of the peergreen framework
      */
     @Override
     public Framework newFramework(Map<String, String> configuration) {
+
+        // Empty map if null
+        if (configuration == null) {
+            configuration = new HashMap<>();
+        }
+
         // Needs to load the bootstrap
         Bootstrap bootstrap = Bootstrap.newBootstrap(null);
 
@@ -58,6 +71,30 @@ public class PeergreenFrameworkFactory implements FrameworkFactory {
         } catch (InstantiationException | IllegalAccessException e) {
             throw new IllegalStateException("Unable to load the framework", e);
         }
+
+        // enable console ?
+        if (Boolean.valueOf(configuration.get(CONSOLE_SHELL))) {
+            // Gets prepare method
+            final Method enableConsoleAtStartupMethod;
+            try {
+                enableConsoleAtStartupMethod = kernelClass.getDeclaredMethod("enableConsoleAtStartup");
+            } catch (NoSuchMethodException | SecurityException e) {
+                throw new IllegalStateException("Unable to load the framework", e);
+            }
+
+            // .. and call it to gets the internal framework of the kernel...
+            boolean isAccessible = enableConsoleAtStartupMethod.isAccessible();
+            try {
+                AccessController.doPrivileged(new SetAccessibleAction(enableConsoleAtStartupMethod));
+                enableConsoleAtStartupMethod.invoke(kernel);
+            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                throw new IllegalStateException("Unable to load the framework", e);
+            } finally {
+                // reset
+                AccessController.doPrivileged(new SetAccessibleAction(enableConsoleAtStartupMethod, isAccessible));
+            }
+        }
+
 
         // Gets prepare method
         final Method prepareMethod;
